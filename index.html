@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>YouTube Shorts Info Tool</title>
+  <style>
+    body {
+      background: #0e0e0e;
+      color: #fff;
+      font-family: sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+    #panel {
+      background: #1e1e1e;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+      width: 340px;
+    }
+    h2 {
+      text-align: center;
+      color: #00e5ff;
+      margin-bottom: 20px;
+    }
+    input, button {
+      width: 100%;
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 16px;
+      border: none;
+    }
+    input {
+      margin-bottom: 12px;
+    }
+    button {
+      background: #00e5ff;
+      color: #000;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #1de9b6;
+    }
+    #result {
+      margin-top: 16px;
+      font-size: 14px;
+      color: #ccc;
+      word-break: break-word;
+      white-space: pre-line;
+    }
+  </style>
+</head>
+<body>
+  <div id="panel">
+    <h2>YT Shorts Info</h2>
+    <input id="videoID" placeholder="Enter Shorts Video ID or URL" />
+    <button onclick="fetchUploadDate()">Get Video Info</button>
+    <div id="result">Paste a Shorts video ID or URL to begin.</div>
+  </div>
+
+  <script>
+    async function fetchUploadDate() {
+      const input = document.getElementById("videoID").value.trim();
+      const result = document.getElementById("result");
+
+      // Extract video ID from full URL or plain ID
+      const match = input.match(/(?:shorts\/)?([a-zA-Z0-9_-]{11})/);
+      const id = match ? match[1] : null;
+
+      if (!id) {
+        result.textContent = "❌ Invalid YouTube Shorts video ID or URL.";
+        return;
+      }
+
+      result.textContent = "⏳ Fetching video data...";
+
+      try {
+        const proxyUrl = "https://corsproxy.io/?" + encodeURIComponent(`https://www.youtube.com/shorts/${id}`);
+        const res = await fetch(proxyUrl);
+        const rawText = await res.text();
+
+        // Decode unicode \u003c, etc.
+        const text = rawText.replace(/\\u[\dA-F]{4}/gi, match =>
+          String.fromCharCode(parseInt(match.replace(/\\u/g, ''), 16))
+        );
+
+        // Extract metadata
+        const dateMatch = text.match(/<meta itemprop="uploadDate" content="([^"]+)"/);
+        const uploadUTC = dateMatch ? dateMatch[1] : null;
+
+        const nameMatch = text.match(/<link itemprop="name" content="([^"]+)"/);
+        const channelName = nameMatch ? nameMatch[1] : null;
+
+        if (!uploadUTC) {
+          result.textContent = "⚠️ Upload date not found in metadata.";
+          return;
+        }
+
+        // Convert to PH Time
+        const utcDate = new Date(uploadUTC);
+        const formatter = new Intl.DateTimeFormat('en-PH', {
+          timeZone: 'Asia/Manila',
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: true,
+        });
+        const phTime = formatter.format(utcDate);
+
+        result.innerText = 
+`YouTube Channel: ${channelName || "❓ Not found"}
+Original UploadDate: ${uploadUTC}
+PH Time (UploadDate): ${phTime}`;
+      } catch (err) {
+        result.textContent = "❌ Failed to fetch video data.";
+        console.error(err);
+      }
+    }
+  </script>
+</body>
+</html>
