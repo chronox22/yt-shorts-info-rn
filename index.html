@@ -2,51 +2,71 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>YouTube Shorts Title Tool</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YouTube Shorts Title & Insights Tool</title>
   <style>
     * { box-sizing: border-box; }
     body {
       margin: 0;
       padding: 40px 16px;
       font-family: 'Segoe UI', sans-serif;
-      background-color: #222222;
+      background-color: #222;
       color: #fff;
     }
     #panel {
       background: #1c1c1e;
       padding: 25px;
-      max-width: 700px;
+      max-width: 900px;
       margin: auto;
       border-radius: 16px;
       box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
     }
     h2 {
-      text-align: center;
       color: #00e5ff;
-      margin-bottom: 10px;
+      text-align: center;
+    }
+    .section-title {
+      color: #00e5ff;
+      border-bottom: 1px solid #333;
+      padding-bottom: 5px;
+      margin-top: 30px;
+      font-size: 18px;
     }
     input[type="text"] {
       width: 100%;
       padding: 12px;
-      border: 1px solid #444;
-      border-radius: 8px;
+      margin: 10px 0;
       background: #2c2c2e;
       color: #fff;
-      margin: 10px 0;
+      border: 1px solid #444;
+      border-radius: 8px;
     }
-    input:focus { border-color: #00e5ff; outline: none; }
     button {
       width: 100%;
       padding: 12px;
-      border: none;
-      border-radius: 8px;
+      margin: 10px 0;
       background: #00e5ff;
       color: #000;
       font-weight: bold;
+      border: none;
+      border-radius: 8px;
       cursor: pointer;
-      margin: 5px 0 16px 0;
     }
-    button:hover { background: #1de9b6; }
+    button:hover {
+      background: #1de9b6;
+    }
+    .result-box {
+      background: #2c2c2e;
+      padding: 10px;
+      border-radius: 10px;
+      margin: 10px 0;
+    }
+    .video-thumb {
+      width: 100%;
+      max-width: 300px;
+      border-radius: 10px;
+      margin-bottom: 10px;
+    }
     .suggestion-item {
       background: #2a2a2a;
       padding: 10px;
@@ -55,180 +75,144 @@
       margin: 5px 0;
     }
     .suggestion-item:hover { background: #3c3c3c; }
-    #result, #copy-result { font-size: 14px; white-space: pre-wrap; }
-    img.thumb { width: 100%; border-radius: 10px; margin: 10px 0; }
-    strong { color: #fff; }
-    .section-title {
-      margin-top: 20px;
-      color: #00e5ff;
-      font-size: 18px;
-      border-bottom: 1px solid #333;
-      padding-bottom: 5px;
-    }
-    #trending {
-      background: #2c2c2e;
-      padding: 10px;
-      border-radius: 8px;
-      margin: 10px 0;
+    #copy-result { font-size: 14px; white-space: pre-wrap; margin-top: 10px; }
+    @media (max-width: 600px) {
+      h2 { font-size: 18px; }
+      .section-title { font-size: 16px; }
     }
   </style>
 </head>
 <body>
   <div id="panel">
-    <h2>YT Shorts Title Tool + Video Info</h2>
+    <h2>YT Shorts Title Tool + Advanced Video Analytics</h2>
 
+    <div class="section-title">🔎 Search YouTube Titles (with Popularity Score)</div>
     <input id="ytSearch" type="text" placeholder="Search YouTube Title..." oninput="getSuggestions()" />
     <div id="suggestions"></div>
     <div id="copy-result"></div>
 
-    <button onclick="downloadCSV()">📂 Export Titles to CSV</button>
-
-    <div class="section-title">🔥 Top 10 Trending Suggestions</div>
-    <div id="trending">N/A</div>
-
-    <input type="text" id="videoID" placeholder="Paste YouTube Shorts ID or URL..." />
-    <button onclick="getInfo()">Get Info</button>
-    <div id="result">Paste a Shorts video ID or URL to begin.</div>
+    <div class="section-title">🎯 Video Insights Panel</div>
+    <input type="text" id="singleVideoID" placeholder="Enter YouTube Shorts ID or URL...">
+    <button onclick="analyzeVideo()">Analyze Video</button>
+    <div id="videoResult" class="result-box">Paste a Shorts video ID or URL to begin.</div>
   </div>
 
   <script>
+    const apiKey = 'AIzaSyBraSXSuQ7AXjtW2CW5ZLoHTrTsADvHgmI';
     const exportData = [];
 
     async function getSuggestions() {
       const query = document.getElementById("ytSearch").value.trim();
       const container = document.getElementById("suggestions");
       document.getElementById("copy-result").innerHTML = "";
-
-      if (!query) {
-        container.innerHTML = "";
-        return;
-      }
-
+      if (!query) return (container.innerHTML = "");
       container.innerHTML = "⏳ Loading suggestions...";
-
       try {
-        const res = await fetch("https://corsproxy.io/?" + encodeURIComponent(
-          `https://suggestqueries.google.com/complete/search?client=firefox&ds=yt&q=${encodeURIComponent(query)}`
-        ));
+        const res = await fetch("https://corsproxy.io/?" + encodeURIComponent(`https://suggestqueries.google.com/complete/search?client=firefox&ds=yt&q=${encodeURIComponent(query)}`));
         const data = await res.json();
         const suggestions = data[1];
-
-        if (suggestions.length === 0) {
-          container.innerHTML = "❌ No suggestions found.";
-          return;
-        }
-
-        container.innerHTML = suggestions.map((s, i) => `
-          <div class="suggestion-item" onclick="copyWithScore('${s}', ${i}, '${query}')">${s}</div>
-        `).join("");
-
-        document.getElementById("trending").innerHTML = suggestions.slice(0, 10).map((s, i) => `#${i+1} ${s}`).join("<br>");
+        if (!suggestions.length) return (container.innerHTML = "❌ No suggestions found.");
+        container.innerHTML = suggestions.map((s, i) => `<div class="suggestion-item" onclick="showScore('${s}', ${i}, '${query}')">${s}</div>`).join("");
       } catch (err) {
         container.innerHTML = "⚠️ Failed to fetch suggestions.";
         console.error(err);
       }
     }
 
-    function copyWithScore(text, index, query) {
-      navigator.clipboard.writeText(text).then(() => {
-        const keywords = query.toLowerCase().split(" ");
-        const titleWords = text.toLowerCase().split(" ");
-        let matchCount = 0;
-        for (let word of keywords) {
-          if (titleWords.includes(word)) matchCount++;
-        }
-
-        let score = 100 - index * 6 + matchCount * 2;
-        score = Math.min(100, Math.max(score, 10));
-
-        exportData.push({ title: text, score, views: Math.floor(Math.random() * 50000 + 5000) });
-
-        document.getElementById("copy-result").innerHTML = `
-🔥 <strong>Popularity Score:</strong> ${score}%
-        `;
-      });
-    }
-
-    function downloadCSV() {
-      const rows = [["Title", "Score", "Estimated Views"]];
-      exportData.forEach(d => rows.push([d.title, d.score, d.views]));
-
-      const csv = rows.map(r => r.join(",")).join("\n");
-      const blob = new Blob([csv], { type: "text/csv" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "yt_titles_export.csv";
-      a.click();
-    }
-
-    async function getInfo() {
-      const input = document.getElementById("videoID").value.trim();
-      const resEl = document.getElementById("result");
-      const m = input.match(/(?:shorts\/|watch\?v=)?([A-Za-z0-9_-]{11})/);
-      if (!m) {
-        resEl.innerHTML = "❌ Invalid ID or URL.";
-        return;
+    function showScore(text, index, query) {
+      const keywords = query.toLowerCase().split(" ");
+      const titleWords = text.toLowerCase().split(" ");
+      let matchCount = 0;
+      for (let word of keywords) {
+        if (titleWords.includes(word)) matchCount++;
       }
-      const id = m[1];
-      resEl.innerHTML = "⏳ Loading info...";
+      let score = 100 - index * 6 + matchCount * 2;
+      score = Math.min(100, Math.max(score, 10));
+      exportData.push({ title: text, score });
+      document.getElementById("copy-result").innerHTML = `🔥 Popularity Score: <strong>${score}%</strong><br><span style='color:#ccc;'>Click to copy: ${text}</span>`;
+    }
 
+    async function fetchVideoDetails(videoId) {
+      const videoRes = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoId}&key=${apiKey}`);
+      const videoData = await videoRes.json();
+      if (!videoData.items || videoData.items.length === 0) return null;
+      const video = videoData.items[0];
+      return {
+        title: video.snippet.title,
+        views: video.statistics.viewCount,
+        likes: video.statistics.likeCount || 0,
+        comments: video.statistics.commentCount || 0,
+        channel: video.snippet.channelTitle,
+        channelId: video.snippet.channelId,
+        upload: video.snippet.publishedAt,
+        tags: video.snippet.tags || [],
+        categoryId: video.snippet.categoryId
+      };
+    }
+
+    async function analyzeVideo() {
+      const input = document.getElementById("singleVideoID").value.trim();
+      const id = input.match(/(?:shorts\/|watch\?v=)?([\w-]{11})/)?.[1];
+      const resultBox = document.getElementById("videoResult");
+      if (!id) return (resultBox.innerHTML = "❌ Invalid Video ID.");
+
+      const details = await fetchVideoDetails(id);
+      if (!details) return (resultBox.innerHTML = "❌ Video not found.");
+
+      const uploadDate = new Date(details.upload);
+      const phUploadDate = uploadDate.toLocaleString('en-PH', { timeZone: 'Asia/Manila' });
+      const suggestedTime = suggestPHBestTime(uploadDate);
+
+      let subscribers = 'N/A';
+      let channelCreated = 'N/A';
+      let totalViews = 'N/A';
+      let country = '❓';
       try {
-        const raw = await (await fetch("https://corsproxy.io/?" + encodeURIComponent(`https://www.youtube.com/shorts/${id}`))).text();
-        const html = raw.replace(/\\u[\dA-F]{4}/gi, m => String.fromCharCode(parseInt(m.slice(2), 16)));
-        const jsonMatch = html.match(/ytInitialPlayerResponse\s*=\s*(\{.+?\});\s*var\s+meta/ms);
-
-        if (!jsonMatch) {
-          resEl.textContent = "⚠️ Could not find video data.";
-          return;
+        const channelRes = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${details.channelId}&key=${apiKey}`);
+        const channelData = await channelRes.json();
+        if (channelData.items?.length > 0) {
+          const channelInfo = channelData.items[0];
+          subscribers = Number(channelInfo.statistics.subscriberCount || 0).toLocaleString();
+          totalViews = Number(channelInfo.statistics.viewCount || 0).toLocaleString();
+          channelCreated = new Date(channelInfo.snippet.publishedAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila' });
+          country = channelInfo.snippet.country || '❓';
         }
+      } catch (e) { console.warn("Channel fetch failed", e); }
 
-        const data = JSON.parse(jsonMatch[1]);
-        const vd = data.videoDetails || {};
-        const mf = data.microformat?.playerMicroformatRenderer || {};
+      let categoryName = details.categoryId;
+      try {
+        const catRes = await fetch(`https://www.googleapis.com/youtube/v3/videoCategories?part=snippet&regionCode=PH&key=${apiKey}`);
+        const catData = await catRes.json();
+        const match = catData.items.find(cat => cat.id === details.categoryId);
+        if (match) categoryName = match.snippet.title;
+      } catch (e) { console.warn("Category fetch failed", e); }
 
-        const title = vd.title || "❓";
-        const tags = Array.isArray(vd.keywords) ? vd.keywords.join(", ") : "❓";
-        const category = mf.category || "❓";
-        const channelName = mf.ownerChannelName || vd.author || "❓";
+      const formattedTags = details.tags.length ? details.tags.join(', ') : '❓';
 
-        const uploadUTC = (html.match(/<meta itemprop="uploadDate" content="([^"]+)"/) || [])[1] || "❓";
-        const phTime = uploadUTC !== "❓" ? new Intl.DateTimeFormat('en-PH', {
-          timeZone: 'Asia/Manila',
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-          hour12: true
-        }).format(new Date(uploadUTC)) : "❓";
-
-        const bestTime = suggestPHBestTime(new Date(uploadUTC));
-        const thumb = `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
-
-        resEl.innerHTML = `
-<img src="${thumb}" class="thumb">
-<strong>Video Title:</strong> ${title}<br>
-<strong>YouTube Channel:</strong> ${channelName}<br>
-<strong>Original UploadDate:</strong> ${uploadUTC}<br>
-<strong>PH Time (UploadDate):</strong> ${phTime}<br>
-<strong>Suggested Upload Time (PH):</strong> ${bestTime}<br>
-<strong>Tags:</strong> ${tags}<br>
-<strong>Category:</strong> ${category}
-        `;
-      } catch (e) {
-        console.error(e);
-        resEl.textContent = "❌ Error fetching or parsing video info.";
-      }
+      resultBox.innerHTML = `
+        <img src="https://img.youtube.com/vi/${id}/hqdefault.jpg" class="video-thumb"><br>
+        <strong>Video Title:</strong> ${details.title}<br><br>
+        <strong>YouTube Channel:</strong> ${details.channel}<br><br>
+        <strong>Original UploadDate:</strong> ${uploadDate.toISOString()}<br><br>
+        <strong>PH Time (UploadDate):</strong> ${phUploadDate}<br><br>
+        <strong>Suggested Upload Time (PH):</strong> 📅 ${suggestedTime}<br><br>
+        <strong>Tags:</strong> ${formattedTags}<br><br>
+        <strong>Category:</strong> ${categoryName}<br>
+        <hr>
+        <strong>CHANNEL INFO</strong><br><br>
+        <strong>Subscribers:</strong> ${subscribers}<br>
+        <strong>Views:</strong> ${totalViews}<br>
+        <strong>Channel Created:</strong> ${channelCreated}<br>
+        <strong>Location:</strong> ${country}<br>
+      `;
     }
 
     function suggestPHBestTime(date) {
       const hour = date.getUTCHours() + 8;
-      if (hour < 10) return "📅 Between 6AM–9AM (good for morning viewers)";
-      if (hour < 15) return "📅 Between 12PM–3PM (lunch/office break)";
-      if (hour < 21) return "📅 Between 6PM–9PM (prime time)";
-      return "📅 After 10PM (for night owls)";
+      if (hour < 10) return "After 6AM – 9AM (morning viewers)";
+      if (hour < 15) return "Between 12PM–3PM (lunch/office break)";
+      if (hour < 21) return "Between 6PM–9PM (prime time)";
+      return "After 10PM (for night owls)";
     }
   </script>
 </body>
